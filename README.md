@@ -84,7 +84,7 @@ courses (many-to-many).
 
 ## Figma
 
-[link to be added once wireframes are done]
+[https://www.figma.com/design/0IMWDjsVUjgSvOnYIjbqGv/EduCore-Wireframes?node-id=1-4381&t=74cdhe8EE4wEHaMC-1]
 
 ## Architecture Diagram
 
