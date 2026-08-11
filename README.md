@@ -88,4 +88,4 @@ courses (many-to-many).
 
 ## Architecture Diagram
 
-[ERD image to be embedded once diagram is done]
+[<img width="1189" height="550" alt="EduCore diagram" src="https://github.com/user-attachments/assets/838ebd78-c344-4a69-8c7c-d8e0f63ad0fe" />]
