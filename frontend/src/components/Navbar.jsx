@@ -1,14 +1,16 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { BookOpen, LogOut, User, Compass } from 'lucide-react';
+import { BookOpen, LogOut, User, Compass, Menu, X, Sparkles } from 'lucide-react';
 
 const Navbar = () => {
   const { user, token, logout } = useAuth();
   const navigate = useNavigate();
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   const handleLogout = () => {
     logout();
+    setMobileMenuOpen(false);
     navigate('/login');
   };
 
@@ -24,14 +26,15 @@ const Navbar = () => {
 
             <Link
               to="/courses"
-              className="flex items-center space-x-1.5 text-slate-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium transition"
+              className="hidden md:flex items-center space-x-1.5 text-slate-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium transition"
             >
               <Compass className="h-4 w-4 text-indigo-400" />
               <span>Courses Directory</span>
             </Link>
           </div>
 
-          <div className="flex items-center space-x-4">
+          {/* Desktop Controls */}
+          <div className="hidden md:flex items-center space-x-4">
             {token && user ? (
               <>
                 <Link
@@ -74,8 +77,69 @@ const Navbar = () => {
               </>
             )}
           </div>
+
+          {/* Mobile Hamburger Button */}
+          <div className="md:hidden flex items-center">
+            <button
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+              className="p-2 rounded-md text-slate-300 hover:text-white hover:bg-slate-800 focus:outline-none"
+            >
+              {mobileMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
+            </button>
+          </div>
         </div>
       </div>
+
+      {/* Mobile Drawer Menu */}
+      {mobileMenuOpen && (
+        <div className="md:hidden bg-slate-800 px-4 pt-2 pb-4 space-y-2 border-t border-slate-700">
+          <Link
+            to="/courses"
+            onClick={() => setMobileMenuOpen(false)}
+            className="block text-slate-200 hover:text-white px-3 py-2 rounded-md text-base font-medium"
+          >
+            Courses Directory
+          </Link>
+
+          {token && user ? (
+            <>
+              <Link
+                to="/dashboard"
+                onClick={() => setMobileMenuOpen(false)}
+                className="block text-slate-200 hover:text-white px-3 py-2 rounded-md text-base font-medium"
+              >
+                Dashboard
+              </Link>
+              <div className="flex items-center space-x-2 px-3 py-2 text-xs font-semibold text-indigo-300">
+                <span>{user.name} ({user.role})</span>
+              </div>
+              <button
+                onClick={handleLogout}
+                className="w-full text-left bg-red-600 hover:bg-red-700 text-white px-3 py-2 rounded-md text-sm font-medium transition"
+              >
+                Logout
+              </button>
+            </>
+          ) : (
+            <>
+              <Link
+                to="/login"
+                onClick={() => setMobileMenuOpen(false)}
+                className="block text-slate-200 hover:text-white px-3 py-2 rounded-md text-base font-medium"
+              >
+                Sign In
+              </Link>
+              <Link
+                to="/register"
+                onClick={() => setMobileMenuOpen(false)}
+                className="block bg-indigo-600 hover:bg-indigo-700 text-white px-3 py-2 rounded-md text-base font-medium text-center"
+              >
+                Get Started
+              </Link>
+            </>
+          )}
+        </div>
+      )}
     </nav>
   );
 };

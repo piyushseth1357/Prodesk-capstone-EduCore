@@ -1,6 +1,6 @@
 # AI Prompts Used — EduCore
 
-I used AI mainly to troubleshoot errors, architect secure authentication pipelines, and build feature modules for Sprint 13, Sprint 14, and Sprint 15. Here's roughly what I asked:
+I used AI mainly to troubleshoot errors, architect secure authentication pipelines, and build feature modules for Sprints 13, 14, 15, and 16. Here's roughly what I asked:
 
 ## Sprint 13 — Planning & Architecture
 1. "What collections should an LMS database have?"
@@ -31,3 +31,13 @@ I used AI mainly to troubleshoot errors, architect secure authentication pipelin
 
 9. "How to create a Stripe Checkout Session endpoint in Node.js and redirect on the frontend?"
    → AI showed setting up `stripe.checkout.sessions.create` with `line_items` and handling the payment success redirect flow.
+
+## Sprint 16 — AI Microservice & Backend Hardening
+10. "How to build a Zod validation middleware for Express returning 400 Bad Request on malformed JSON?"
+    → AI assisted with `validateRequest` middleware wrapper using `schema.parseAsync(req.body)` and returning structured `400 Bad Request` JSON error details.
+
+11. "How to catch Mongoose CastError globally in Express error handling middleware?"
+    → AI explained checking `if (err.name === 'CastError')` in global error handler middleware to prevent fatal server crashes and return clean `400 Bad Request`.
+
+12. "How to architect a server-side Google Gemini AI endpoint in Express using @google/generative-ai SDK?"
+    → AI guided building `POST /api/ai/suggest` using server-side `GEMINI_API_KEY`, forcing strict JSON LLM responses, and implementing `express-rate-limit` throttling (`429 Too Many Requests`).

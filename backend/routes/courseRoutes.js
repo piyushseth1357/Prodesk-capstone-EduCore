@@ -4,11 +4,13 @@ const Course = require('../models/Course');
 const Lesson = require('../models/Lesson');
 const Enrollment = require('../models/Enrollment');
 const { protect } = require('../middleware/authMiddleware');
+const validateRequest = require('../middleware/validateRequest');
+const { createCourseSchema, updateCourseSchema } = require('../validators/courseValidator');
 
 // @route   GET /api/courses
 // @desc    Get all courses with optional filters
 // @access  Public
-router.get('/', async (req, res) => {
+router.get('/', async (req, res, next) => {
   try {
     const { category, level, search } = req.query;
     const query = {};
@@ -32,15 +34,14 @@ router.get('/', async (req, res) => {
 
     res.json(courses);
   } catch (error) {
-    console.error('Error fetching courses:', error);
-    res.status(500).json({ message: 'Server error while fetching courses' });
+    next(error);
   }
 });
 
 // @route   GET /api/courses/my-courses
 // @desc    Get courses owned by instructor or enrolled by student
 // @access  Private
-router.get('/my-courses', protect, async (req, res) => {
+router.get('/my-courses', protect, async (req, res, next) => {
   try {
     if (req.user.role === 'instructor') {
       const courses = await Course.find({ instructor: req.user._id })
@@ -66,43 +67,34 @@ router.get('/my-courses', protect, async (req, res) => {
       return res.json({ role: 'student', courses });
     }
   } catch (error) {
-    console.error('Error fetching my courses:', error);
-    res.status(500).json({ message: 'Server error while fetching user courses' });
+    next(error);
   }
 });
 
 // @route   GET /api/courses/:id
 // @desc    Get course by ID with lessons
 // @access  Public
-router.get('/:id', async (req, res) => {
+router.get('/:id', async (req, res, next) => {
   try {
     const course = await Course.findById(req.params.id).populate('instructor', 'name email role');
     if (!course) {
-      return res.status(404).json({ message: 'Course not found' });
+      return res.status(404).json({ status: 'fail', error: 'Not Found', message: 'Course not found' });
     }
 
     const lessons = await Lesson.find({ course: course._id }).sort({ order: 1 });
 
     res.json({ ...course._doc, lessons });
   } catch (error) {
-    console.error('Error fetching course details:', error);
-    if (error.kind === 'ObjectId') {
-      return res.status(404).json({ message: 'Invalid Course ID format' });
-    }
-    res.status(500).json({ message: 'Server error while fetching course details' });
+    next(error);
   }
 });
 
 // @route   POST /api/courses
-// @desc    Create a new course
+// @desc    Create a new course with Zod payload validation
 // @access  Private (Instructor)
-router.post('/', protect, async (req, res) => {
+router.post('/', protect, validateRequest(createCourseSchema), async (req, res, next) => {
   try {
     const { title, description, category, level, price, thumbnail, lessons } = req.body;
-
-    if (!title || !description) {
-      return res.status(400).json({ message: 'Please provide course title and description' });
-    }
 
     const course = await Course.create({
       title,
@@ -114,7 +106,6 @@ router.post('/', protect, async (req, res) => {
       instructor: req.user._id
     });
 
-    // Optionally create lessons if provided
     if (lessons && Array.isArray(lessons) && lessons.length > 0) {
       const lessonDocs = lessons.map((l, index) => ({
         course: course._id,
@@ -129,26 +120,26 @@ router.post('/', protect, async (req, res) => {
     const populatedCourse = await Course.findById(course._id).populate('instructor', 'name email');
     res.status(201).json(populatedCourse);
   } catch (error) {
-    console.error('Error creating course:', error);
-    res.status(500).json({ message: error.message || 'Server error while creating course' });
+    next(error);
   }
 });
 
 // @route   PUT /api/courses/:id
-// @desc    Update course with ownership validation
+// @desc    Update course with Zod validation & ownership validation
 // @access  Private (Owner Only)
-router.put('/:id', protect, async (req, res) => {
+router.put('/:id', protect, validateRequest(updateCourseSchema), async (req, res, next) => {
   try {
     const course = await Course.findById(req.params.id);
 
     if (!course) {
-      return res.status(404).json({ message: 'Course not found' });
+      return res.status(404).json({ status: 'fail', error: 'Not Found', message: 'Course not found' });
     }
 
     // DATA OWNERSHIP VALIDATION (CRITICAL P0)
-    // Compare document's instructor against decoded userId from JWT token
     if (course.instructor.toString() !== req.user._id.toString()) {
       return res.status(403).json({
+        status: 'fail',
+        error: 'Forbidden',
         message: 'Forbidden: You do not have ownership rights to modify this course'
       });
     }
@@ -167,66 +158,57 @@ router.put('/:id', protect, async (req, res) => {
 
     res.json(populated);
   } catch (error) {
-    console.error('Error updating course:', error);
-    if (error.kind === 'ObjectId') {
-      return res.status(404).json({ message: 'Invalid Course ID format' });
-    }
-    res.status(500).json({ message: 'Server error while updating course' });
+    next(error);
   }
 });
 
 // @route   DELETE /api/courses/:id
 // @desc    Delete course with ownership validation
 // @access  Private (Owner Only)
-router.delete('/:id', protect, async (req, res) => {
+router.delete('/:id', protect, async (req, res, next) => {
   try {
     const course = await Course.findById(req.params.id);
 
     if (!course) {
-      return res.status(404).json({ message: 'Course not found' });
+      return res.status(404).json({ status: 'fail', error: 'Not Found', message: 'Course not found' });
     }
 
     // DATA OWNERSHIP VALIDATION (CRITICAL P0)
-    // Compare document's instructor against decoded userId from JWT token
     if (course.instructor.toString() !== req.user._id.toString()) {
       return res.status(403).json({
+        status: 'fail',
+        error: 'Forbidden',
         message: 'Forbidden: You do not have ownership rights to delete this course'
       });
     }
 
-    // Delete associated lessons and enrollments
     await Lesson.deleteMany({ course: course._id });
     await Enrollment.deleteMany({ course: course._id });
     await Course.findByIdAndDelete(course._id);
 
-    res.json({ message: 'Course deleted successfully', courseId: req.params.id });
+    res.json({ status: 'success', message: 'Course deleted successfully', courseId: req.params.id });
   } catch (error) {
-    console.error('Error deleting course:', error);
-    if (error.kind === 'ObjectId') {
-      return res.status(404).json({ message: 'Invalid Course ID format' });
-    }
-    res.status(500).json({ message: 'Server error while deleting course' });
+    next(error);
   }
 });
 
 // @route   POST /api/courses/:id/enroll
 // @desc    Enroll student in course
 // @access  Private
-router.post('/:id/enroll', protect, async (req, res) => {
+router.post('/:id/enroll', protect, async (req, res, next) => {
   try {
     const course = await Course.findById(req.params.id);
     if (!course) {
-      return res.status(404).json({ message: 'Course not found' });
+      return res.status(404).json({ status: 'fail', error: 'Not Found', message: 'Course not found' });
     }
 
-    // Check if already enrolled
     const existingEnrollment = await Enrollment.findOne({
       student: req.user._id,
       course: course._id
     });
 
     if (existingEnrollment) {
-      return res.status(400).json({ message: 'You are already enrolled in this course' });
+      return res.status(400).json({ status: 'fail', error: 'Bad Request', message: 'You are already enrolled in this course' });
     }
 
     const enrollment = await Enrollment.create({
@@ -236,12 +218,12 @@ router.post('/:id/enroll', protect, async (req, res) => {
     });
 
     res.status(201).json({
+      status: 'success',
       message: 'Successfully enrolled in course!',
       enrollment
     });
   } catch (error) {
-    console.error('Error enrolling in course:', error);
-    res.status(500).json({ message: 'Server error during course enrollment' });
+    next(error);
   }
 });
 

@@ -3,6 +3,8 @@ const router = express.Router();
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const { protect } = require('../middleware/authMiddleware');
+const validateRequest = require('../middleware/validateRequest');
+const { registerSchema, loginSchema } = require('../validators/authValidator');
 
 // Generate JWT token helper
 const generateToken = (id) => {
@@ -14,21 +16,19 @@ const generateToken = (id) => {
 // @route   POST /api/auth/register
 // @desc    Register a new user (Student or Instructor)
 // @access  Public
-router.post('/register', async (req, res) => {
+router.post('/register', validateRequest(registerSchema), async (req, res, next) => {
   try {
     const { name, email, password, role } = req.body;
 
-    if (!name || !email || !password) {
-      return res.status(400).json({ message: 'Please provide name, email, and password' });
-    }
-
-    // Check if user already exists
     const userExists = await User.findOne({ email });
     if (userExists) {
-      return res.status(400).json({ message: 'User already exists with this email' });
+      return res.status(400).json({
+        status: 'fail',
+        error: 'Bad Request',
+        message: 'User already exists with this email address'
+      });
     }
 
-    // Create user (Password will be hashed automatically by pre-save hook in User model)
     const user = await User.create({
       name,
       email,
@@ -36,39 +36,31 @@ router.post('/register', async (req, res) => {
       role: role || 'student'
     });
 
-    if (user) {
-      res.status(201).json({
-        _id: user._id,
-        name: user.name,
-        email: user.email,
-        role: user.role,
-        token: generateToken(user._id)
-      });
-    } else {
-      res.status(400).json({ message: 'Invalid user data received' });
-    }
+    res.status(201).json({
+      status: 'success',
+      _id: user._id,
+      name: user.name,
+      email: user.email,
+      role: user.role,
+      token: generateToken(user._id)
+    });
   } catch (error) {
-    console.error('Registration Error:', error);
-    res.status(500).json({ message: error.message || 'Server error during registration' });
+    next(error);
   }
 });
 
 // @route   POST /api/auth/login
 // @desc    Authenticate user & get token
 // @access  Public
-router.post('/login', async (req, res) => {
+router.post('/login', validateRequest(loginSchema), async (req, res, next) => {
   try {
     const { email, password } = req.body;
 
-    if (!email || !password) {
-      return res.status(400).json({ message: 'Please provide email and password' });
-    }
-
-    // Check for user by email
     const user = await User.findOne({ email });
 
     if (user && (await user.matchPassword(password))) {
       res.json({
+        status: 'success',
         _id: user._id,
         name: user.name,
         email: user.email,
@@ -76,20 +68,24 @@ router.post('/login', async (req, res) => {
         token: generateToken(user._id)
       });
     } else {
-      res.status(401).json({ message: 'Invalid email or password' });
+      res.status(401).json({
+        status: 'fail',
+        error: 'Unauthorized',
+        message: 'Invalid email or password'
+      });
     }
   } catch (error) {
-    console.error('Login Error:', error);
-    res.status(500).json({ message: error.message || 'Server error during login' });
+    next(error);
   }
 });
 
 // @route   GET /api/auth/me
 // @desc    Get current user profile
 // @access  Private
-router.get('/me', protect, async (req, res) => {
+router.get('/me', protect, async (req, res, next) => {
   try {
     res.json({
+      status: 'success',
       _id: req.user._id,
       name: req.user.name,
       email: req.user.email,
@@ -97,7 +93,7 @@ router.get('/me', protect, async (req, res) => {
       createdAt: req.user.createdAt
     });
   } catch (error) {
-    res.status(500).json({ message: 'Error retrieving user profile' });
+    next(error);
   }
 });
 
